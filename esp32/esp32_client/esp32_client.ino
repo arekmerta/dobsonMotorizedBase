@@ -13,11 +13,14 @@
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_GPS.h>
 
+#include "joystick.cpp"
+//Joystick
+Joystick stick(BUTTON_GPIO, 20);
+
 //GPS
 #define RXD2 16
 #define TXD2 17
 Adafruit_GPS GPS(&Serial2);
-
 
 //Photo
 static int shutterDelay = 1;
@@ -49,8 +52,6 @@ static volatile float heading, yaw;
 static volatile bool newHeading = false, newYaw = false;
 
 static BLEClient*  pClient;
-
-#define diffProc(a,b) abs((a-b)/b)*100.
 
 #define SECONDS_1 1000
 #define SECONDS_5 5000
@@ -395,12 +396,6 @@ static float lastHeading = 0., lastYaw = 0.;
 #define MENU_SHUTTER 1
 #define MENU_POSITION 2
 
-#define BUTTON_UP    100
-#define BUTTON_DOWN  101
-#define BUTTON_OK    102
-#define BUTTON_LEFT  103
-#define BUTTON_RIGHT 104
-
 //which_menu, which_position, new_menu
 void canvas_settings(char button){
   static int menuNow = MENU_MAIN;
@@ -414,8 +409,9 @@ void canvas_settings(char button){
     lcd_print(2, 2, "Shutter       " );
   }else if( menuNow == MENU_SHUTTER ){
     lcd_print(0, 0, "Shutter menu  " );
-    lcd_print(2, 1, "Delay (s)     " );
-    lcd_print(2, 2, "Series (n)    " );
+    lcd_print(2, 1, "Delay(s)      " );
+    lcd_print(2, 2, "Series(n)     " );
+    lcd_print(2, 3, "Dark Series(n)" );
   }else if ( menuNow == MENU_POSITION ){
     //not a real menu, display canvas
     canvas = CANVAS_POSITION;
@@ -469,11 +465,16 @@ void canvas_shutter(){
 //**********************************************
 //Loop
 void loop() {
-  char button = 0;
+  stick.loop();
+  
   if( canvas == CANVAS_POSITION ){
     canvas_position();
   } else if ( canvas == CANVAS_MENU ){
-    canvas_settings(button);
+    
+    if( stick.getOK() ){
+      canvas_settings( BUTTON_OK );
+    }else canvas_settings( stick.getArrow() );
+    
   }else if (canvas == CANVAS_SHUTTER ){
      canvas_shutter();
   }
