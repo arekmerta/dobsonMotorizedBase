@@ -14,6 +14,9 @@
 #include <Adafruit_GPS.h>
 
 #include "joystick.cpp"
+#include "lcd_menu.cpp"
+#include "defs.h"
+
 //Joystick
 Joystick stick(BUTTON_GPIO, 20);
 
@@ -21,10 +24,6 @@ Joystick stick(BUTTON_GPIO, 20);
 #define RXD2 16
 #define TXD2 17
 Adafruit_GPS GPS(&Serial2);
-
-//Photo
-static int shutterDelay = 1;
-static int shutterSeries = 1;
 
 //LCD
 #define LCD_COLUMNS 16 
@@ -53,39 +52,48 @@ static volatile bool newHeading = false, newYaw = false;
 
 static BLEClient*  pClient;
 
-#define SECONDS_1 1000
-#define SECONDS_5 5000
-#define SECONDS_10 10000
-#define SECONDS_30 30000
+//Menus
+#define MENU_MAIN          100
+#define MENU_MAIN_POSITION 101
+#define MENU_MAIN_GOTO     102
+#define MENU_MAIN_CAMERA   103
+
+#define MENU_GOTO          200
+#define MENU_GOTO_1        201
+#define MENU_GOTO_2        202
+
+
+#define MENU_CAMERA        300
+#define MENU_CAMERA_1      301
+#define MENU_CAMERA_2      302
+
+
+tMenuItem menus[]{
+  MENU_MAIN,           MENU_TYPE_HEADING, MENU_NOSIBLING, "Main            ", MENU_NOSIBLING, 0, 0, 0,
+  MENU_MAIN_POSITION,  MENU_TYPE_ACTION,  MENU_MAIN,      " Position       ", MENU_NOSIBLING, 0, 0, 0,
+  MENU_MAIN_GOTO,      MENU_TYPE_SUBITEM, MENU_MAIN,      " GoTo           ", MENU_GOTO, 0, 0, 0,
+  MENU_MAIN_CAMERA,    MENU_TYPE_SUBITEM, MENU_MAIN,      " Camera         ", MENU_CAMERA, 0, 0, 0,
+  
+  MENU_GOTO,           MENU_TYPE_HEADING, MENU_NOSIBLING, "GoTo            ", MENU_NOSIBLING, 0, 0, 0,
+  MENU_GOTO_1,         MENU_TYPE_ACTION,  MENU_GOTO,      " --goto_1--     ", MENU_GOTO_1, 0, 0, 0,
+  MENU_GOTO_2,         MENU_TYPE_ACTION,  MENU_GOTO,      " --goto_2--     ", MENU_GOTO_2, 0, 0, 0,
+
+  MENU_CAMERA,         MENU_TYPE_HEADING, MENU_NOSIBLING, "Main            ", MENU_NOSIBLING, 0, 0, 0,
+  MENU_CAMERA_1,       MENU_TYPE_ACTION,  MENU_CAMERA,    " -camera-1-     ", MENU_CAMERA_1, 0, 0, 0,
+  MENU_CAMERA_2,       MENU_TYPE_ACTION,  MENU_CAMERA,    " -camera-1-     ", MENU_CAMERA_2, 0, 0, 0,
+
+//Always add last element - so that no need to add menu table size
+  MENU_NOSIBLING,          MENU_TYPE_LAST,    MENU_NOSIBLING, "", MENU_NOSIBLING, 0, 0, 0,
+  
+};
+
+LcdMenu lcdMenu(&lcd, menus);
 
 //Canvas
 #define CANVAS_POSITION 1
-#define CANVAS_MENU 2
+#define CANVAS_MENU     2
 #define CANVAS_SHUTTER  3
-
 static volatile int canvas = CANVAS_POSITION;
-//**********************************************
-//Logging
-//#define LOG_LEVEL_INFO_VERBOSE
-#define LOG_LEVEL_INFO
-
-#if defined(LOG_LEVEL_INFO_VERBOSE)
-  #define log_v(...) Serial.print(__VA_ARGS__)
-  #define log_vln(...) Serial.println(__VA_ARGS__)
-  #define log_i(...) Serial.print(__VA_ARGS__)
-  #define log_iln(...) Serial.println(__VA_ARGS__)
-#elif defined(LOG_LEVEL_INFO)
-  #define log_v(...) 
-  #define log_vln(...) 
-  #define log_i(...) Serial.print(__VA_ARGS__)
-  #define log_iln(...) Serial.println(__VA_ARGS__)
-#else
-  #define log_v(...) 
-  #define log_vln(...) 
-  #define log_i(...) 
-  #define log_iln(...) 
-#endif
-
 //**********************************************
 //Characteristics data conversions
 
@@ -265,47 +273,51 @@ bool connectToServer(BLEClient*  pClient) {
 //Setup
 void setup() {
   Serial.begin(115200);
-  
+
+  //LCD
   log_iln("Starting LCD");
   lcd.init(); 
   lcd.backlight();
-  lcd.setCursor(0, 0); 
-  lcd.print("Init...");
+  lcd_print(0, 0, "Initializing...");
     
   log_iln("Starting Arduino BLE Client application...");
+  //BLE
   BLEDevice::init("");
   pClient = BLEDevice::createClient();
   pClient->setClientCallbacks(new MyClientCallback());
-  
   // Connect to the remove BLE Server.
   if( !(connected = connectToServer(pClient))){
-    pClient->disconnect();
+    wasConnected = true;
   }else{
-    lcd.setCursor(0, 0); 
-    lcd.print("Connected.   ");
+    lcd_print(0, 0, "BLE:connected   ");
     wasConnected = true;
   }
-
+  //GPS
   log_iln("Starting GPS...");
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
-  
+  GPS.begin(9600);
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
 } 
 //**********************************************
-void lcd_print(int row, int col, String txt){
-  lcd.setCursor(row, col );
-  lcd.print(txt);
-}
 
 void canvas_position(){
-static float lastHeading = 0., lastYaw = 0.;
-  static float MAX_DIFF = 0.1;//%
+  static float lastHeading = 0., lastYaw = 0.;
+  int MAX_DIFF = 1;//%
   static uint32_t gpsTimer = millis() - 10000;
   static uint32_t thingyDisconnectTimer = millis();
-    
+
+  //GPS
+  while(GPS.available())GPS.read();
+  
+  if (GPS.newNMEAreceived()) {
+    log_vln( GPS.lastNMEA() ); 
+    if (!GPS.parse(GPS.lastNMEA())) return; 
+  }
+  
   if( !connected && wasConnected) {
     log_iln("---->DISCONNECTED");
     
-    lcd_print(0, 0, "Disconnected.   ");
+    lcd_print(0, 0, "BLE:disconnected");
     
     lcd_print(0, 1, "                ");
     
@@ -319,11 +331,10 @@ static float lastHeading = 0., lastYaw = 0.;
     connected = connectToServer(pClient);
 
     if( connected ){
-      lcd_print( 0, 0, "Connected.   ");
+      lcd_print( 0, 0, "BLE:connected   ");
       wasConnected = true;
     }
-    thingyDisconnectTimer = millis();
-    
+    thingyDisconnectTimer = millis();  
   }
   
   if( newHeading ){
@@ -351,112 +362,60 @@ static float lastHeading = 0., lastYaw = 0.;
     newYaw = false;
     lastYaw = yaw;
   }
-  char c = GPS.read();
-  if (GPS.newNMEAreceived()) {
-    log_vln( GPS.lastNMEA() ); 
-    if (!GPS.parse(GPS.lastNMEA())) return; 
-  }
+  
+  
   if (GPS.fix && (millis() - gpsTimer > SECONDS_5) ) {
     gpsTimer = millis();
-    log_i(GPS.latitude, 4); log_i(GPS.lat);
-    log_i(", ");
-    log_i(GPS.longitude, 4); log_iln(GPS.lon);
-    log_i("Altitude: "); log_iln(GPS.altitude);
+    //log_i(GPS.latitude, 4); log_i(GPS.lat);
+    //log_i(", ");
+    //log_i(GPS.longitude, 4); log_iln(GPS.lon);
+    //log_i("Altitude: "); log_iln(GPS.altitude);
 
+    //Latitude
     lcd.setCursor(0, 2); 
     lcd.print( GPS.lat );
     lcd.print( " " );
     lcd.print( GPS.latitude );
-      
-    lcd.setCursor(0, 3); 
-    lcd.print( GPS.lon );
-    lcd.print( " " );
-    lcd.print( GPS.longitude);
-
-    //Date and time
-    lcd.setCursor(11, 2); 
+    lcd.print("  ");
+    //Date
     if(  GPS.day < 10 )lcd.print('0');
     lcd.print(GPS.day, DEC); lcd.print('/');
     if(  GPS.month < 10 )lcd.print('0');
     lcd.print(GPS.month, DEC); 
 
-    //Date and time
-    lcd.setCursor(11, 3);
+    //Long
+    lcd.setCursor(0, 3); 
+    lcd.print( GPS.lon );
+    lcd.print( " " );
+    lcd.print( GPS.longitude);
+    lcd.print("  ");
+    //Time
     if(  GPS.hour+2 < 10 )lcd.print('0');
     lcd.print(GPS.hour+2, DEC); lcd.print(':');
     if(  GPS.minute < 10 )lcd.print('0');
     lcd.print(GPS.minute, DEC); 
   }else if (!GPS.fix){
-    lcd_print(0, 2, "No GPS fix yet  " );
+    lcd_print(0, 2, "GPS: no fix yet ");
     lcd_print(0, 3, "                ");
   }  
 }
 //**********************************************
-#define MENU_MAIN 0
-#define MENU_SHUTTER 1
-#define MENU_POSITION 2
+void canvas_menu(char button){
 
-//which_menu, which_position, new_menu
-void canvas_settings(char button){
-  static int menuNow = MENU_MAIN;
-  static int menuItem = 1, lastMenuItem = 1;
-  static boolean refresh = true;
-  static int maxSubitems = 2;
-  
-  if( menuNow == MENU_MAIN ){
-    lcd_print(0, 0, "Main menu     " );
-    lcd_print(2, 1, "Position      " );
-    lcd_print(2, 2, "Shutter       " );
-  }else if( menuNow == MENU_SHUTTER ){
-    lcd_print(0, 0, "Shutter menu  " );
-    lcd_print(2, 1, "Delay(s)      " );
-    lcd_print(2, 2, "Series(n)     " );
-    lcd_print(2, 3, "Dark Series(n)" );
-  }else if ( menuNow == MENU_POSITION ){
-    //not a real menu, display canvas
+  static int menuNow = MENU_NOSIBLING;
+
+  if( menuNow == MENU_NOSIBLING ){
+    lcdMenu.displayMenu( MENU_MAIN );
+    menuNow = MENU_MAIN;
+  }
+
+  int res = lcdMenu.loop(button);
+
+  if( res == MENU_MAIN_POSITION ){
     canvas = CANVAS_POSITION;
-    return;
+    menuNow = MENU_NOSIBLING;
+    
   }
-
-  if( lastMenuItem != menuItem ){
-    lcd.setCursor(0, lastMenuItem );
-    lcd.print(" ");
-    lastMenuItem = menuItem;
-  }
-
-  lcd.setCursor(0, menuItem );
-  lcd.print(">");
-
-
-  if( button == BUTTON_UP ){
-    menuItem = menuItem > 1?menuItem-1:1;
-  }
-  if( button == BUTTON_DOWN ){
-    menuItem = menuItem < maxSubitems?menuItem+1:maxSubitems;
-  }
-  if( button == BUTTON_LEFT ){
-    if(menuNow == MENU_SHUTTER && menuItem == 1 )
-      shutterDelay = shutterDelay>1?shutterDelay-1:1;
-
-    if(menuNow == MENU_SHUTTER && menuItem == 2 )
-      shutterSeries = shutterSeries>1?shutterSeries-1:1;
-  }
-  if( button == BUTTON_RIGHT ){
-    if(menuNow == MENU_SHUTTER && menuItem == 1 )
-      shutterDelay = shutterDelay>1?shutterDelay-1:1;
-      
-    if(menuNow == MENU_SHUTTER && menuItem == 2 )
-      shutterSeries = shutterSeries+1;
-  }
-  if ( button == BUTTON_OK ){
-    if(menuNow == MENU_MAIN && menuItem == 1)
-      menuNow = MENU_POSITION;
-    if(menuNow == MENU_MAIN && menuItem == 2)
-      menuNow = MENU_SHUTTER;
-  
-  }
-
-  
 }
 //**********************************************
 void canvas_shutter(){
@@ -468,14 +427,17 @@ void loop() {
   stick.loop();
   
   if( canvas == CANVAS_POSITION ){
-    canvas_position();
-  } else if ( canvas == CANVAS_MENU ){
-    
     if( stick.getOK() ){
-      canvas_settings( BUTTON_OK );
-    }else canvas_settings( stick.getArrow() );
-    
-  }else if (canvas == CANVAS_SHUTTER ){
-     canvas_shutter();
+      canvas = CANVAS_MENU;
+    }else{
+      canvas_position();
+    }
+  } 
+  
+  if ( canvas == CANVAS_MENU ){
+    if( stick.getOK() ){  
+      canvas_menu( BUTTON_OK );
+    }else 
+      canvas_menu( stick.getArrow() );
   }
 }

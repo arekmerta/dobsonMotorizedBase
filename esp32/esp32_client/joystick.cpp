@@ -1,21 +1,11 @@
 #include <Arduino.h>
+#include "defs.h"
 
 #define X_AXIS_GPIO 34
 #define Y_AXIS_GPIO 35
 #define BUTTON_GPIO 32
 
-#define diffProc(a,b) (int)(abs((float)(a-b)/(float)b)*100.)
-
 //Class for joystick working as keyboard
-//Prevents multi-press
-#define BUTTON_UP    100
-#define BUTTON_DOWN  101
-#define BUTTON_OK    102
-#define BUTTON_LEFT  103
-#define BUTTON_RIGHT 104
-
-#define BUTTON_NOARROW 0
-
 
 class Joystick{
   private:
