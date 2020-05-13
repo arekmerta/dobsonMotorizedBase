@@ -2,7 +2,7 @@
 This site contains source code for my Dobson motorized telescope base. It was originally designed for Celestron C90 Mac and Canon 450D/Rebel DSLR camera, but can be adapted (or used directly) for similar setups. 
 
 You can find the whole project description here (in Polish):
-http://uczymy.edu.pl/wp/podstawa-teleskopu-celestron-c90-mak-typu-dobson/
+[Podstawa Teleskopu](http://uczymy.edu.pl/wp/podstawa-teleskopu-celestron-c90-mak-typu-dobson/)
 
 The project has been splint into number of phases:
 * Mark I - the base is moved manually, no code/electronics needed,
