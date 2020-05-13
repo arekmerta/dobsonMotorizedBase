@@ -1,3 +1,7 @@
+//Keyes sjoy to keyboard
+//
+//For more on my dobson stand go to: http://uczymy.edu.pl/wp/podstawa-teleskopu-celestron-c90-mak-typu-dobson/
+
 #include <Arduino.h>
 #include "defs.h"
 
@@ -20,11 +24,9 @@ class Joystick{
     int _buttonArrowPRESSED = 0;
     uint32_t _arrowMillis = 0;
 
-    
   public:
     //gpioBtn: where Btn pin is connected
-    //limit: percent what it means that stick has been moved
-    //noRepeat: true: button does not repeat - must be released first
+    //limit: percent what it means that stick has been moved, actually sensitivity
     Joystick(int gpioBtn, int limit){
       _gpioBtn = gpioBtn;
       _limit = limit;
@@ -52,6 +54,7 @@ class Joystick{
     }
     
     void loop(){
+           
       int btn = digitalRead( BUTTON_GPIO );  
 
       //check if not pressed

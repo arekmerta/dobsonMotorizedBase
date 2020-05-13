@@ -1,4 +1,7 @@
-//NUmber of defines used in project
+//Number of defines used in project
+//
+//For more on my dobson stand go to: http://uczymy.edu.pl/wp/podstawa-teleskopu-celestron-c90-mak-typu-dobson/
+
 #define lcd_print(row, col, ...)lcd.setCursor(row, col ); lcd.print(__VA_ARGS__)
 
 #define SECONDS_1 1000
@@ -36,3 +39,6 @@
 #define BUTTON_LEFT  103
 #define BUTTON_RIGHT 104
 #define BUTTON_NOARROW 0
+
+#define LCD_COLUMNS 16 
+#define LCD_ROWS 4

@@ -1,4 +1,4 @@
-//uczymy.edu.pl: based on multiple examples (list may not be complete)
+//uczymy.edu.pl: based on multiple examples (list may not be complete):
 //Based on BLE_Client example from https://github.com/espressif/arduino-esp32
 //     author unknown
 //     updated by chegewara
@@ -7,6 +7,7 @@
 //Based on ESP32 Hardware Serial2 Example from https://circuits4you.com/2018/12/31/esp32-hardware-serial2-example/
 //Based on Adafruit example GPS_HardwareSerial from https://github.com/adafruit/Adafruit_GPS
 //
+//For more on my dobson stand go to: http://uczymy.edu.pl/wp/podstawa-teleskopu-celestron-c90-mak-typu-dobson/
 
 #include <stdio.h> // for function sprintf
 #include "BLEDevice.h"
@@ -26,8 +27,6 @@ Joystick stick(BUTTON_GPIO, 20);
 Adafruit_GPS GPS(&Serial2);
 
 //LCD
-#define LCD_COLUMNS 16 
-#define LCD_ROWS 4
 
 LiquidCrystal_I2C lcd(0x38, LCD_COLUMNS, LCD_ROWS);
 
@@ -66,6 +65,7 @@ static BLEClient*  pClient;
 #define MENU_CAMERA        300
 #define MENU_CAMERA_1      301
 #define MENU_CAMERA_2      302
+#define MENU_CAMERA_3      303
 
 
 tMenuItem menus[]{
@@ -75,19 +75,20 @@ tMenuItem menus[]{
   MENU_MAIN_CAMERA,    MENU_TYPE_SUBITEM, MENU_MAIN,      " Camera         ", MENU_CAMERA, 0, 0, 0,
   
   MENU_GOTO,           MENU_TYPE_HEADING, MENU_NOSIBLING, "GoTo            ", MENU_NOSIBLING, 0, 0, 0,
-  MENU_GOTO_1,         MENU_TYPE_ACTION,  MENU_GOTO,      " --goto_1--     ", MENU_GOTO_1, 0, 0, 0,
-  MENU_GOTO_2,         MENU_TYPE_ACTION,  MENU_GOTO,      " --goto_2--     ", MENU_GOTO_2, 0, 0, 0,
+  MENU_GOTO_1,         MENU_TYPE_VALUE,  MENU_GOTO,      " --goto_1--     ", MENU_GOTO_1, 0, 10, 0,
+  MENU_GOTO_2,         MENU_TYPE_VALUE,  MENU_GOTO,      " --goto_2--     ", MENU_GOTO_2, 0, 10, 0,
 
   MENU_CAMERA,         MENU_TYPE_HEADING, MENU_NOSIBLING, "Main            ", MENU_NOSIBLING, 0, 0, 0,
-  MENU_CAMERA_1,       MENU_TYPE_ACTION,  MENU_CAMERA,    " -camera-1-     ", MENU_CAMERA_1, 0, 0, 0,
-  MENU_CAMERA_2,       MENU_TYPE_ACTION,  MENU_CAMERA,    " -camera-1-     ", MENU_CAMERA_2, 0, 0, 0,
-
+  MENU_CAMERA_1,       MENU_TYPE_ACTION,  MENU_CAMERA,    " Shutter(s)     ", MENU_CAMERA_1, 1, 30, 0,
+  MENU_CAMERA_2,       MENU_TYPE_ACTION,  MENU_CAMERA,    " Shots(n)       ", MENU_CAMERA_2, 1, 50, 0,
+  MENU_CAMERA_3,       MENU_TYPE_ACTION,  MENU_CAMERA,    " Dark(n)        ", MENU_CAMERA_2, 1, 20, 0,
+ 
 //Always add last element - so that no need to add menu table size
   MENU_NOSIBLING,          MENU_TYPE_LAST,    MENU_NOSIBLING, "", MENU_NOSIBLING, 0, 0, 0,
   
 };
 
-LcdMenu lcdMenu(&lcd, menus);
+LcdMenu lcdMenu(&lcd, menus, MENU_MAIN_POSITION);
 
 //Canvas
 #define CANVAS_POSITION 1
@@ -300,11 +301,21 @@ void setup() {
 } 
 //**********************************************
 
-void canvas_position(){
-  static float lastHeading = 0., lastYaw = 0.;
+void canvas_position(boolean firstEntry){
   int MAX_DIFF = 1;//%
+  
+  static float lastHeading = 0., lastYaw = 0.;
   static uint32_t gpsTimer = millis() - 10000;
   static uint32_t thingyDisconnectTimer = millis();
+
+  //This is just to reset "refresh" settings
+  if( firstEntry ){
+    lastHeading = 0.;
+    lastYaw = 0.;
+    gpsTimer = millis() - 10000;
+    thingyDisconnectTimer = millis();
+  
+  }
 
   //GPS
   while(GPS.available())GPS.read();
@@ -424,13 +435,16 @@ void canvas_shutter(){
 //**********************************************
 //Loop
 void loop() {
+  static boolean firstEntry = true;
+  
   stick.loop();
   
   if( canvas == CANVAS_POSITION ){
     if( stick.getOK() ){
       canvas = CANVAS_MENU;
     }else{
-      canvas_position();
+      canvas_position(firstEntry);
+      firstEntry = false;
     }
   } 
   
@@ -439,5 +453,9 @@ void loop() {
       canvas_menu( BUTTON_OK );
     }else 
       canvas_menu( stick.getArrow() );
+      //we are leaving menu
+      if( canvas == CANVAS_POSITION ){
+        firstEntry = true;  
+      }
   }
 }
