@@ -16,5 +16,4 @@ Progress register:
 Date|Phase|Achievement
 ----|-----|-----------
 May, 2020|Mark I|Completed
-----|-----|-----------
 May, 2020|Mark II| Developing code for the ESP32 (reading Thingy:52 heading and yaw, reading GPS/UART, LCD display on I2C, analog joystick)
