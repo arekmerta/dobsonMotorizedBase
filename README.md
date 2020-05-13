@@ -11,5 +11,8 @@ The project has been splint into number of phases:
 * Mark IV: user can select an object on the sky - and the telescope tube will be moved to this position,
 * Mark V: support for astrophotography,
 
-May, 2020
-Project is now entering Mark II. I'm developing code for the ESP32.
+Progress register:
+
+Date|Phase|Achievement
+May, 2020|Mark I|Completed
+May, 2020|Mark II| Developing code for the ESP32 (reading Thingy:52 heading and yaw, reading GPS/UART, LCD display on I2C, analog joystick)
