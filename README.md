@@ -6,10 +6,10 @@ You can find the whole project description here (in Polish):
 
 The project has been splint into number of phases:
 * Mark I - the base is moved manually, no code/electronics needed,
-* Mark II - the base position is controlled and displayed on a LCD,
-* Mark III: the base X and Y axis is motorized, there is Arduino with CNC board controlling motors,
-* Mark IV: user can select an object on the sky - and the telescope tube will be moved to this position,
-* Mark V: support for astrophotography,
+* Mark II - the base position is controlled and displayed on a LCD, esp32 part
+* Mark III: the base X and Y axis is motorized, Arduino with CNC part,
+* Mark IV: user can select an object on the sky - and the telescope tube will be moved to this position, esp32+communication with Arduino
+* Mark V: support for astrophotography, esp32
 
 Progress register:
 
