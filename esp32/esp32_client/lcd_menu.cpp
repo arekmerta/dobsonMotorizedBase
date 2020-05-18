@@ -138,7 +138,7 @@ public:
       lastActivity = millis();  
     }
 
-    if( (millis() - lastActivity) > SECONDS_10 ){
+    if( (millis() - lastActivity) > SECONDS_5 ){
       return _noActivityId;
     }
     

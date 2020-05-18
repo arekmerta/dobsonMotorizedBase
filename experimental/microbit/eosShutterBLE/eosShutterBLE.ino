@@ -14,12 +14,15 @@ BLEPeripheral            blePeripheral        = BLEPeripheral(BLE_REQ, BLE_RDY, 
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
 // create switch and button characteristic
-//1st byte: no of shots; 2nd byte: delay in seconds
-BLEIntCharacteristic    shooterConfigCharacteristic   = BLEIntCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
-//0: stop; 1: start
-BLECharCharacteristic    shooterStartCharacteristic    = BLECharCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLEWrite);
-//1st byte: current shot; 2nd byte: no of shots
-BLEIntCharacteristic    shooterProgressCharacteristic = BLEIntCharacteristic ("2f93708401034730ae11df4a514bdfb3", BLERead | BLENotify);
+// minor byte: no of shots; major byte: delay in seconds
+BLEShortCharacteristic    shooterConfigCharacteristic   = BLEShortCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
+//minor byte: current shot; major byte: status, as: 0: idle (not started); 1: busy: shooting now; 2: about to start;  3: finished
+#define STATUS_IDLE 0x0000
+#define STATUS_BUSY 0x0100
+#define STATUS_STARTING 0x0200
+#define STATUS_FINISHED 0x0300
+
+BLEShortCharacteristic    shooterProgressCharacteristic = BLEShortCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify);
 
 //Pin #0 - large pad - analog in
 //Pin #1 - large pad - analog in
@@ -41,12 +44,13 @@ void setup() {
   // add service and characteristics
   blePeripheral.addAttribute(cameraShutterService);
   blePeripheral.addAttribute(shooterConfigCharacteristic);
-  blePeripheral.addAttribute(shooterStartCharacteristic);
   blePeripheral.addAttribute(shooterProgressCharacteristic);
   
   blePeripheral.begin();
 
- microbit.begin();
+  bleUpdateProgress(0, STATUS_IDLE );
+
+  microbit.begin();
   microbit.fillScreen(LED_OFF);
 
 }
@@ -115,6 +119,8 @@ public:
       inShot = false;     
       inWait = false;
       _lastStarted = started;
+      //BLE
+      bleUpdateProgress( 0, STATUS_STARTING );
     }
 
     if( inWait ){
@@ -156,8 +162,12 @@ public:
         inShot = true;
         triggerShot();
         myTimer = millis();     
+        //Inform on started shot
+        bleUpdateProgress(_nShotNow, STATUS_BUSY);
       }
     }else{
+      //Inform on shooting end
+      bleUpdateProgress( _nShots, STATUS_FINISHED );
       return false;
     }
   
@@ -173,11 +183,17 @@ public:
     
     if( (millis() - myTimer ) > _nTimeOut ){
       stopShot();
+      //Make sure the pixel is dimmed
+      int col = _nShotNow % 5;
+      int row = ( _nShotNow % 20 )  / 5 ;
+      microbit.drawPixel( col, row, LED_OFF);
+      
       _nShotNow+=1;
       inShot = false;
       //Wait timer to start next shot
       myTimer = millis();
       inWait = true;
+      
     }
     return true;
   }
@@ -185,6 +201,12 @@ public:
 
 //No of shots, time, timeout between shots
 CameraShutter cs(5, 10, 2);
+
+
+void bleUpdateProgress(int nShotNow, int nStatus){
+  shooterProgressCharacteristic.setValue( nShotNow + nStatus );
+  blePeripheral.poll();
+}
 
 void loop() {
   static boolean started = false;
@@ -194,27 +216,26 @@ void loop() {
 
   if (shooterConfigCharacteristic.written() ) {
     int val = shooterConfigCharacteristic.value();
-    int nShots   = val >>16;
-    int nTimeOut = val & 0x00FF;
+
+    int nShots   = val & 0x00FF;
+    int nTimeOut = (val & 0xFF00 ) >> 8;
 
     Serial.print("BLE: got shots: ");
     Serial.println(nShots);
 
     Serial.print("BLE: got timeout: ");
     Serial.println(nTimeOut);
-    
-  }/*
-  if (shooterStartCharacteristic.written() ) {
-    bool nStart   = (bool)shooterConfigCharacteristic.value();
-    
-    Serial.print("BLE: got start: ");
-    Serial.println(nStart);
-  }*/
 
-  //started = cs.loop( started );
-  if( started ){
-    //end of sequence
+    cs.setShots( nShots );
+    cs.setTimeout( nTimeOut * 1000 );
+    
+    Serial.println("Starting shooting session...");
+    started = true;
   }
+ 
+
+  started = cs.loop( started );
+  
   if (! digitalRead(PIN_BUTTON_A)) {
     started = true;
   }

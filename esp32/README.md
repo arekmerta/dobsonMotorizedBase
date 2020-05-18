@@ -14,6 +14,15 @@ This project is using:
 # Environment
 Use with Arduino IDE.
 
+# Configuration
+Board: ESP32 Dev Module
+Upload speed: 921600
+CPU Frequecy: 240 MHz
+Flash Frequency: 80 MHz
+Flash Mode: QIO
+Partition Scheme: Hudge App
+PSRAM: disabled
+
 # What's there?
 ESP32 is there to:
 * read values from Nordic Thingy:52 (like heading and yaw) over BLE, 
