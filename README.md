@@ -11,7 +11,12 @@ The project has been splint into number of phases:
 * Mark IV: user can select an object on the sky - and the telescope tube will be moved to this position, esp32+communication with Arduino
 * Mark V: support for astrophotography, esp32
 
-Progress register:
+## Notes  
+* The 'arduino' dir contains code for arduino and CNC shield - driving base motors
+* The 'esp32' dir contains code for esp32 - driving getting position from thingy:52 sensors, driving LCD, being controlled by a joystick
+* The 'experimental' dir contains some additional code - not diectly used for project (e.g. remote shutter for canon eos with micro:bit over BLE)  
+
+## Progress:
 
 Date|Phase|Achievement
 ----|-----|-----------
