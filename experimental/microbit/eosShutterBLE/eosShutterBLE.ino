@@ -1,3 +1,6 @@
+/*
+ * uczymy.edu.pl - based on BLEPeripheral example
+ */
 #include <Adafruit_Microbit.h>
 #include <BLEPeripheral.h>
 
@@ -14,7 +17,7 @@ BLEPeripheral            blePeripheral        = BLEPeripheral(BLE_REQ, BLE_RDY, 
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
 // create switch and button characteristic
-// minor byte: no of shots; major byte: delay in seconds
+// minor byte: no of shots; major byte: speed in seconds
 BLEShortCharacteristic    shooterConfigCharacteristic   = BLEShortCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
 //minor byte: current shot; major byte: status, as: 0: idle (not started); 1: busy: shooting now; 2: about to start;  3: finished
 #define STATUS_IDLE 0x0000
@@ -28,7 +31,9 @@ BLEShortCharacteristic    shooterProgressCharacteristic = BLEShortCharacteristic
 //Pin #1 - large pad - analog in
 //Pin #2 - large pad - analog in
  
-
+/*
+ * Setup
+ */
 void setup() {
   Serial.begin(9600);
   
@@ -55,6 +60,9 @@ void setup() {
 
 }
 
+/*
+ * Camera Shutter class
+ */
 class CameraShutter{
 private:
   int _nShots;
@@ -199,15 +207,23 @@ public:
   }
 };
 
-//No of shots, time, timeout between shots
+/*
+ * Shutter class instance
+ * No of shots, time, timeout between shots
+ */
 CameraShutter cs(5, 10, 2);
 
-
+/*
+ * Update BLE notifications
+ */
 void bleUpdateProgress(int nShotNow, int nStatus){
   shooterProgressCharacteristic.setValue( nShotNow + nStatus );
   blePeripheral.poll();
 }
 
+/*
+ * Loop function
+ */
 void loop() {
   static boolean started = false;
 
@@ -233,7 +249,6 @@ void loop() {
     started = true;
   }
  
-
   started = cs.loop( started );
   
   if (! digitalRead(PIN_BUTTON_A)) {
