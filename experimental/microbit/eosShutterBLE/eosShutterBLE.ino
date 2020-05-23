@@ -11,6 +11,8 @@ Adafruit_Microbit_Matrix microbit;
 #define BLE_RDY     2
 #define BLE_RST     9
 
+#define MICROBIT_SHUTTER_PIN 2
+
 // create peripheral instance, see pinouts above
 BLEPeripheral            blePeripheral        = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
 
@@ -73,10 +75,10 @@ private:
   int triggerShot(){
     Serial.print("Shooting #");
     Serial.println(getShotNow());
-    analogWrite(0, 0);
+    analogWrite(MICROBIT_SHUTTER_PIN, 0);
   }
   int stopShot(){
-    pinMode(0, INPUT);
+    pinMode(MICROBIT_SHUTTER_PIN, INPUT);
     Serial.println("\t...End");
   }
 
