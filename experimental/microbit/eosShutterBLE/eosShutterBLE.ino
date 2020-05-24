@@ -14,7 +14,7 @@ Adafruit_Microbit_Matrix microbit;
 #define MICROBIT_SHUTTER_PIN 2
 
 // create peripheral instance, see pinouts above
-BLEPeripheral            blePeripheral        = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
+BLEPeripheral            blePeripheral        = BLEPeripheral();//BLE_REQ, BLE_RDY, BLE_RST);
 
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
@@ -113,6 +113,24 @@ public:
     static bool inWait = false;
     static int32_t myTimer = millis();
   
+    //Re-init
+    if( _lastStarted != started ){
+      Serial.println("Resetting...");
+      stopShot();
+      microbit.fillScreen(LED_OFF);
+      myTimer = millis();
+      _nShotNow = 0;
+      inShot = false;     
+      inWait = false;
+      _lastStarted = started;
+      //BLE
+      if( started ){
+        bleUpdateProgress( 0, STATUS_STARTING );
+      }else{
+        bleUpdateProgress( 0, STATUS_FINISHED );
+      }
+    }
+
     if( !started ){
       microbit.fillScreen(LED_ON);
       delay(200);
@@ -121,18 +139,7 @@ public:
       _lastStarted = started;
       return false;
     }
-    //Re-init
-    if( _lastStarted != started ){
-      microbit.fillScreen(LED_OFF);
-      myTimer = millis();
-      _nShotNow = 0;
-      inShot = false;     
-      inWait = false;
-      _lastStarted = started;
-      //BLE
-      bleUpdateProgress( 0, STATUS_STARTING );
-    }
-
+    
     if( inWait ){
       if( (millis() - myTimer) > _nTimeOutBetweenShots ){
         inWait = false;
@@ -144,9 +151,6 @@ public:
       }
     
     }
-  
-    //microbit.drawPixel( col, row, LED_ON);
-    
     if( inShot == false ){
       int item=( _nShotNow / 20 ) * 20;
     
@@ -176,11 +180,22 @@ public:
         bleUpdateProgress(_nShotNow, STATUS_BUSY);
       }
     }else{
-      //Inform on shooting end
-      bleUpdateProgress( _nShots, STATUS_FINISHED );
       return false;
     }
   
+    if( ( inShot && (millis() - myTimer ) > (_nTimeOut +200 ) ) ){
+      stopShot();
+      //Make sure the pixel is dimmed
+      int col = _nShotNow % 5;
+      int row = ( _nShotNow % 20 )  / 5 ;
+      microbit.drawPixel( col, row, LED_OFF);  
+      _nShotNow+=1;
+      inShot = false;
+      //Wait timer to start next shot
+      myTimer = millis();
+      inWait = true;   
+    }
+
     if( inShot ){
       int col = _nShotNow % 5;
       int row = ( _nShotNow % 20 )  / 5 ;
@@ -190,21 +205,7 @@ public:
       microbit.drawPixel( col, row, LED_ON);
       delay(100);
     }
-    
-    if( (millis() - myTimer ) > _nTimeOut ){
-      stopShot();
-      //Make sure the pixel is dimmed
-      int col = _nShotNow % 5;
-      int row = ( _nShotNow % 20 )  / 5 ;
-      microbit.drawPixel( col, row, LED_OFF);
-      
-      _nShotNow+=1;
-      inShot = false;
-      //Wait timer to start next shot
-      myTimer = millis();
-      inWait = true;
-      
-    }
+  
     return true;
   }
 };
@@ -213,7 +214,7 @@ public:
  * Shutter class instance
  * No of shots, time, timeout between shots
  */
-CameraShutter cs(5, 10, 2);
+CameraShutter cs(5, 5, 5);
 
 /*
  * Update BLE notifications
@@ -255,5 +256,8 @@ void loop() {
   
   if (! digitalRead(PIN_BUTTON_A)) {
     started = true;
+  }
+  if (! digitalRead(PIN_BUTTON_B)) {
+    started = false;
   }
 }
