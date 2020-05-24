@@ -19,13 +19,15 @@ BLEPeripheral            blePeripheral        = BLEPeripheral();//BLE_REQ, BLE_R
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
 // create switch and button characteristic
-// minor byte: no of shots; major byte: speed in seconds
-BLEShortCharacteristic    shooterConfigCharacteristic   = BLEShortCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
+// minor byte: no of shots; 2nd byte: speed in seconds, 3rd byte - elapse in seconds
+BLEUnsignedIntCharacteristic    shooterConfigCharacteristic   = BLEUnsignedIntCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
 //minor byte: current shot; major byte: status, as: 0: idle (not started); 1: busy: shooting now; 2: about to start;  3: finished
 #define STATUS_IDLE 0x0000
 #define STATUS_BUSY 0x0100
 #define STATUS_STARTING 0x0200
 #define STATUS_FINISHED 0x0300
+#define STATUS_ELAPSE 0x0400
+
 #define STATUS_ABORTED 0x1300
 
 BLEShortCharacteristic    shooterProgressCharacteristic = BLEShortCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify);
@@ -56,6 +58,7 @@ void setup() {
   
   blePeripheral.begin();
 
+  //BLE
   bleUpdateProgress(0, STATUS_IDLE );
 
   microbit.begin();
@@ -70,8 +73,8 @@ class CameraShutter{
 private:
   int _nShots;
   int _nShotNow = 0;
-  int _nTimeOut = 0;
-  int _nTimeOutBetweenShots = 0;
+  int _nSpeedMS = 0;
+  int _nElapseMS = 0;
   
   int triggerShot(){
     Serial.print("Shooting #");
@@ -85,11 +88,11 @@ private:
 
   
 public:
-  CameraShutter(int nShots, int nTimeOutSeconds, int nTimeOutBetweenShots){
+  CameraShutter(unsigned int nShots, unsigned int nSpeedMS, unsigned int nElapseMS){
     pinMode(0, INPUT);
     _nShots = nShots;
-    _nTimeOut = nTimeOutSeconds * 1000;
-    _nTimeOutBetweenShots = nTimeOutBetweenShots * 1000;
+    _nSpeedMS = nSpeedMS;
+    _nElapseMS = nElapseMS;
   }
 
   int getShotNow(){
@@ -104,8 +107,12 @@ public:
     _nShots = nShots;
   }
 
-  boolean setTimeout(int nTimeOutSeconds){
-    _nTimeOut = nTimeOutSeconds;
+  boolean setSpeedMS(int nSpeedMS){
+    _nSpeedMS = nSpeedMS;
+  }
+
+  boolean setElapseMS(int nElapseMS){
+    _nElapseMS = nElapseMS;
   }
 
   boolean loop(boolean started){
@@ -142,7 +149,7 @@ public:
     }
     
     if( inWait ){
-      if( (millis() - myTimer) > _nTimeOutBetweenShots ){
+      if( (millis() - myTimer) > _nElapseMS ){
         inWait = false;
         microbit.drawPixel( 4, 4, LED_OFF);
         
@@ -183,8 +190,10 @@ public:
     }else{
       return false;
     }
+
+     int32_t timeDiff = millis() - myTimer ;
   
-    if( ( inShot && (millis() - myTimer ) > (_nTimeOut +200 ) ) ){
+    if( ( inShot && ( timeDiff > (_nSpeedMS +200 ) ) ) ){
       stopShot();
       //Make sure the pixel is dimmed
       int col = _nShotNow % 5;
@@ -195,6 +204,8 @@ public:
       //Wait timer to start next shot
       myTimer = millis();
       inWait = true;   
+      //BLE
+      bleUpdateProgress(_nShotNow, STATUS_ELAPSE);
     }
 
     if( inShot ){
@@ -206,16 +217,15 @@ public:
       microbit.drawPixel( col, row, LED_ON);
       delay(100);
     }
-  
     return true;
   }
 };
 
 /*
  * Shutter class instance
- * No of shots, time, timeout between shots
+ * No of shots, speed, elapse
  */
-CameraShutter cs(5, 5, 5);
+CameraShutter cs(5, 2000, 5000);
 
 /*
  * Update BLE notifications
@@ -235,19 +245,24 @@ void loop() {
   blePeripheral.poll();
 
   if (shooterConfigCharacteristic.written() ) {
-    int val = shooterConfigCharacteristic.value();
+    unsigned int val = shooterConfigCharacteristic.value();
 
     int nShots   = val & 0x00FF;
-    int nTimeOut = (val & 0xFF00 ) >> 8;
+    int nSpeed = (val & 0xFF00 ) >> 8;
+    int nElapse = (val & 0xFF0000 ) >> 16;
 
     Serial.print("BLE: got shots: ");
     Serial.println(nShots);
 
-    Serial.print("BLE: got timeout: ");
-    Serial.println(nTimeOut);
+    Serial.print("BLE: got speed: ");
+    Serial.println(nSpeed);
+
+    Serial.print("BLE: got elapse: ");
+    Serial.println(nElapse);
 
     cs.setShots( nShots );
-    cs.setTimeout( nTimeOut * 1000 );
+    cs.setSpeedMS( nSpeed   * 1000 );
+    cs.setElapseMS( nElapse * 1000 );
     
     Serial.println("Starting shooting session...");
     started = true;
