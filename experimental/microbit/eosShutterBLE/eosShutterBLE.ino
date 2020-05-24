@@ -26,6 +26,7 @@ BLEShortCharacteristic    shooterConfigCharacteristic   = BLEShortCharacteristic
 #define STATUS_BUSY 0x0100
 #define STATUS_STARTING 0x0200
 #define STATUS_FINISHED 0x0300
+#define STATUS_ABORTED 0x1300
 
 BLEShortCharacteristic    shooterProgressCharacteristic = BLEShortCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify);
 
@@ -259,5 +260,7 @@ void loop() {
   }
   if (! digitalRead(PIN_BUTTON_B)) {
     started = false;
+    //BLE
+     bleUpdateProgress( 0, STATUS_ABORTED );
   }
 }
