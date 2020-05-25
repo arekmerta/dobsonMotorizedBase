@@ -120,6 +120,7 @@ public:
     static bool inShot = false;
     static bool inWait = false;
     static int32_t myTimer = millis();
+    static bool pixel_on_off = false;
   
     //Re-init
     if( _lastStarted != started ){
@@ -191,9 +192,9 @@ public:
       return false;
     }
 
-     int32_t timeDiff = millis() - myTimer ;
+    int32_t timeDiff = millis() - myTimer ;
   
-    if( ( inShot && ( timeDiff > (_nSpeedMS +200 ) ) ) ){
+    if( inShot && ( timeDiff > _nSpeedMS ) ){
       stopShot();
       //Make sure the pixel is dimmed
       int col = _nShotNow % 5;
@@ -202,20 +203,20 @@ public:
       _nShotNow+=1;
       inShot = false;
       //Wait timer to start next shot
-      myTimer = millis();
       inWait = true;   
       //BLE
       bleUpdateProgress(_nShotNow, STATUS_ELAPSE);
+      myTimer = millis();
     }
 
-    if( inShot ){
+    //There may be no time to flip leds
+    if( inShot && ( timeDiff > 100 ) ){
       int col = _nShotNow % 5;
       int row = ( _nShotNow % 20 )  / 5 ;
-      
-      microbit.drawPixel( col, row, LED_OFF);
+
+      microbit.drawPixel( col, row, pixel_on_off==false?LED_ON:LED_OFF);
       delay(100);
-      microbit.drawPixel( col, row, LED_ON);
-      delay(100);
+      pixel_on_off = !pixel_on_off;
     }
     return true;
   }
@@ -249,7 +250,7 @@ void loop() {
 
     int nShots   = val & 0x00FF;
     int nSpeed = (val & 0xFF00 ) >> 8;
-    int nElapse = (val & 0xFF0000 ) >> 16;
+    int nElapse = ( (val & 0xFF0000 ) >> 16 )*1000;
 
     Serial.print("BLE: got shots: ");
     Serial.println(nShots);
@@ -257,12 +258,24 @@ void loop() {
     Serial.print("BLE: got speed: ");
     Serial.println(nSpeed);
 
+    if( nSpeed & 0x80 ){
+      //parts of second send
+      nSpeed = nSpeed & 0b01111111;
+      nSpeed = 1000 / nSpeed;
+      
+    }else{
+      nSpeed = nSpeed * 1000;
+    }
+
+    Serial.print("BLE: got [ms] speed: ");
+    Serial.println(nSpeed);
+
     Serial.print("BLE: got elapse: ");
     Serial.println(nElapse);
 
     cs.setShots( nShots );
-    cs.setSpeedMS( nSpeed   * 1000 );
-    cs.setElapseMS( nElapse * 1000 );
+    cs.setSpeedMS( nSpeed );
+    cs.setElapseMS( nElapse );
     
     Serial.println("Starting shooting session...");
     started = true;
