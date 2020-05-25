@@ -4,6 +4,8 @@
 #include <Adafruit_Microbit.h>
 #include <BLEPeripheral.h>
 
+#include "BLEUnsignedShortArrayCharacteristic.h"
+
 Adafruit_Microbit_Matrix microbit;
 
 // define pins (varies per shield/board)
@@ -14,23 +16,25 @@ Adafruit_Microbit_Matrix microbit;
 #define MICROBIT_SHUTTER_PIN 2
 
 // create peripheral instance, see pinouts above
-BLEPeripheral            blePeripheral        = BLEPeripheral();//BLE_REQ, BLE_RDY, BLE_RST);
+BLEPeripheral            blePeripheral        = BLEPeripheral();
 
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
+
 // create switch and button characteristic
-// minor byte: no of shots; 2nd byte: speed in seconds, 3rd byte - elapse in seconds
-BLEUnsignedIntCharacteristic    shooterConfigCharacteristic   = BLEUnsignedIntCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLERead | BLEWrite);
+// 1st ushort: no of shots; 2nd ushort: speed in seconds, 3rd byte - elapse in seconds
+//for the 2nd ushort: MSB if set to 1, rest keeps parts of seconds (1/)
+BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsignedShortArrayCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLEWrite, 3);
 //minor byte: current shot; major byte: status, as: 0: idle (not started); 1: busy: shooting now; 2: about to start;  3: finished
-#define STATUS_IDLE 0x0000
-#define STATUS_BUSY 0x0100
-#define STATUS_STARTING 0x0200
-#define STATUS_FINISHED 0x0300
-#define STATUS_ELAPSE 0x0400
+#define STATUS_IDLE 0x00
+#define STATUS_BUSY 0x01
+#define STATUS_STARTING 0x02
+#define STATUS_FINISHED 0x03
+#define STATUS_ELAPSE 0x04
 
-#define STATUS_ABORTED 0x1300
+#define STATUS_ABORTED 0x13
 
-BLEShortCharacteristic    shooterProgressCharacteristic = BLEShortCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify);
+BLEUnsignedShortArrayCharacteristic    shooterProgressCharacteristic = BLEUnsignedShortArrayCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLEWrite | BLENotify, 2);
 
 //Pin #0 - large pad - analog in
 //Pin #1 - large pad - analog in
@@ -63,7 +67,6 @@ void setup() {
 
   microbit.begin();
   microbit.fillScreen(LED_OFF);
-
 }
 
 /*
@@ -73,8 +76,8 @@ class CameraShutter{
 private:
   int _nShots;
   int _nShotNow = 0;
-  int _nSpeedMS = 0;
-  int _nElapseMS = 0;
+  int32_t _nSpeedMS = 0;
+  int32_t _nElapseMS = 0;
   
   int triggerShot(){
     Serial.print("Shooting #");
@@ -85,10 +88,14 @@ private:
     pinMode(MICROBIT_SHUTTER_PIN, INPUT);
     Serial.println("\t...End");
   }
-
   
 public:
-  CameraShutter(unsigned int nShots, unsigned int nSpeedMS, unsigned int nElapseMS){
+  /*
+   * nShots: number of shots
+   * nSpeedMS: speed of shutter, in miliseconds
+   * nElapseMS: time between shots, in miliseconds
+   */
+  CameraShutter(unsigned int nShots, int32_t nSpeedMS, int32_t nElapseMS){
     pinMode(0, INPUT);
     _nShots = nShots;
     _nSpeedMS = nSpeedMS;
@@ -196,6 +203,8 @@ public:
   
     if( inShot && ( timeDiff > _nSpeedMS ) ){
       stopShot();
+      Serial.print("Recorded time:");
+      Serial.println(timeDiff);
       //Make sure the pixel is dimmed
       int col = _nShotNow % 5;
       int row = ( _nShotNow % 20 )  / 5 ;
@@ -231,8 +240,9 @@ CameraShutter cs(5, 2000, 5000);
 /*
  * Update BLE notifications
  */
-void bleUpdateProgress(int nShotNow, int nStatus){
-  shooterProgressCharacteristic.setValue( nShotNow + nStatus );
+void bleUpdateProgress(unsigned short nShotNow, unsigned short nStatus){
+  unsigned short arr[2] = {nShotNow, nStatus };
+  shooterProgressCharacteristic.setUShortValues( arr );
   blePeripheral.poll();
 }
 
@@ -246,31 +256,44 @@ void loop() {
   blePeripheral.poll();
 
   if (shooterConfigCharacteristic.written() ) {
+    /*
     unsigned int val = shooterConfigCharacteristic.value();
 
     int nShots   = val & 0x00FF;
     int nSpeed = (val & 0xFF00 ) >> 8;
     int nElapse = ( (val & 0xFF0000 ) >> 16 )*1000;
+    */
+    unsigned short vals[3];
+    shooterConfigCharacteristic.getUShortValues(vals);
 
+    int nShots   = vals[0];
+    int nSpeed =  vals[1];
+    int nElapse = vals[2];
+    
     Serial.print("BLE: got shots: ");
     Serial.println(nShots);
 
     Serial.print("BLE: got speed: ");
     Serial.println(nSpeed);
 
-    if( nSpeed & 0x80 ){
+    Serial.print("BLE: got elapse: ");
+    Serial.println(nElapse);
+
+
+    if( nSpeed & 0x8000 ){
       //parts of second send
       nSpeed = nSpeed & 0b01111111;
       nSpeed = 1000 / nSpeed;
-      
     }else{
       nSpeed = nSpeed * 1000;
     }
 
+    nElapse = nElapse * 1000;
+
     Serial.print("BLE: got [ms] speed: ");
     Serial.println(nSpeed);
 
-    Serial.print("BLE: got elapse: ");
+    Serial.print("BLE: got [ms] elapse: ");
     Serial.println(nElapse);
 
     cs.setShots( nShots );
