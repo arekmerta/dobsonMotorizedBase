@@ -31,10 +31,9 @@ BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsign
 #define STATUS_STARTING 0x02
 #define STATUS_FINISHED 0x03
 #define STATUS_ELAPSE 0x04
-
 #define STATUS_ABORTED 0x13
 
-BLEUnsignedShortArrayCharacteristic    shooterProgressCharacteristic = BLEUnsignedShortArrayCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLEWrite | BLENotify, 2);
+BLEUnsignedShortArrayCharacteristic    shooterProgressCharacteristic = BLEUnsignedShortArrayCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify, 2);
 
 //Pin #0 - large pad - analog in
 //Pin #1 - large pad - analog in
