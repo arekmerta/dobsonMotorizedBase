@@ -10,9 +10,6 @@ class BLEUnsignedShortArrayCharacteristic : public BLEFixedLengthCharacteristic 
    
     bool getUShortValues(unsigned short* arr);
     bool setUShortValues(unsigned short*arr);
-    //bool setUShortValue(unsigned char index, unsigned short value);
-
-    //virtual unsigned char valueSize() const;
 };
 
 #endif
