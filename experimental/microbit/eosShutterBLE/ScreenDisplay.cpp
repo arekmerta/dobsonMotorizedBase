@@ -1,8 +1,13 @@
 #include <Arduino.h>
 #include "ScreenDisplay.h"
 
-//https://github.com/adafruit/Adafruit_Microbit/blob/master/examples/timerdemo/timerdemo.ino
-//https://forum.arduino.cc/index.php?topic=66670.0
+/*
+ * micro:bit led display driver  
+ * 
+ * Baed on:
+ * https://github.com/adafruit/Adafruit_Microbit/blob/master/examples/timerdemo/timerdemo.ino
+ * https://forum.arduino.cc/index.php?topic=66670.0
+ */
 
 void ScreenDisplay::loop(void) {
   static int _thisPowerLine = 0;
@@ -37,7 +42,6 @@ void ScreenDisplay::_drawPixel(int row, int col, int state){
   int pl_col = microbit_pins[row][col]._col;
 
   powerLines[pl-26]._up           = LED_ON?true:false;      
-
 }
 
 void ScreenDisplay::_fillScreen(int state){
@@ -73,15 +77,6 @@ void ScreenDisplay::drawPixel(int row, int col, int state){
   if (state != _buffer[row][col] ){
     _buffer[row][col]=state;
     _drawPixel(row, col, state);
-/*  
-    Serial.print("ss.drawPixel( ");
-    Serial.print(row);
-    Serial.print(", ");
-    Serial.print(col);
-    Serial.print(", ");
-    Serial.print(state);
-    Serial.println(");");
-    */
   }
   
 }

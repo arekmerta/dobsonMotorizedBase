@@ -4,9 +4,6 @@
 #define LED_ON 1
 #define LED_OFF 0
 
-#define LED_ON 1
-#define LED_OFF 0
-
 struct A_PIN{
 unsigned char _row;
 unsigned char _col;
@@ -28,6 +25,7 @@ struct POWER_LINE{
 class ScreenDisplay{
   private:
     unsigned char _buffer[5][5];
+
     POWER_LINE powerLines[3]={{26, false},{27, false},{28, false}};
 
     void _drawPixel(int row, int col, int state);

@@ -11,25 +11,26 @@
 
 #define LIGHT_ADJUSTMENT_FACTOR 5
 #define LIGHT_SPEED_CHANGE_THRESHOLD 5
-
-#define diffProc(a,b) ((int)(abs((float)(a-b)/(float)b)*100.))*(a>b?-1:1)
-
 #define MICROBIT_SHUTTER_PIN 2
 
-// create peripheral instance, see pinouts above
+//calculate
+#define diffProc(a,b) ((int)(abs((float)(a-b)/(float)b)*100.))*(a>b?-1:1)
+
+
+// create peripheral instance, see pinouts above percentage diff between two values
 BLEPeripheral            blePeripheral        = BLEPeripheral();
 
 // create service
 BLEService               cameraShutterService          = BLEService            ("2f93708401004730ae11df4a514bdfb3");
 
-// create switch and button characteristic
-// 1st ushort: no of shots; 2nd ushort: speed in seconds, 3rd byte - elapse in seconds
-//for the 2nd ushort: MSB if set to 1, rest keeps parts of seconds (1/)
-//4th byte: the settings:
-
+// create switch and button characteristic; based on array of ushort:
+// - 1st: no of shots; 
+// - 2nd: speed in seconds
+// - 3rd: byte - elapse in seconds
+// - 4th byte: the settings (see Settings class)
 BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsignedShortArrayCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLEWrite, 4);
 
-//minor short: current shot; major short: status, as:
+//Status and progress method:
 #define STATUS_IDLE 0x00
 #define STATUS_BUSY 0x01
 #define STATUS_STARTING 0x02
@@ -39,9 +40,6 @@ BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsign
 #define STATUS_SPEED_ADJUST 0x21
 
 BLEUnsignedShortArrayCharacteristic    shooterProgressCharacteristic = BLEUnsignedShortArrayCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify, 2);
-
-
-
 
 /*
  * Update BLE notifications
@@ -310,16 +308,12 @@ public:
 };
 
 /*
- * Additional instances
+ * Instances of used classes
  */
 Settings settings;
 
 ScreenDisplay sd;
 
-/*
- * Shutter class instance
- * No of shots, speed, elapse
- */
 CameraShutter cs(11, 2000, 5000, true, &sd);
 
 /*

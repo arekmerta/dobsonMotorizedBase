@@ -29,13 +29,7 @@ bool BLEUnsignedShortArrayCharacteristic::setUShortValues(unsigned short*vals){
   unsigned char b2 = (vals[1]) & 0xFF;
   
   unsigned char arrs[4]={a2,a1,b2,b1};
-/*
-  Serial.print("Setting output: ");
-  Serial.print(a1,HEX);Serial.print(",");
-  Serial.print(a2,HEX);Serial.print(",");
-  Serial.print(b1,HEX);Serial.print(",");
-  Serial.print(b2,HEX);Serial.println(",");
-*/
+
   setValue(arrs, 4);
 
   return true;
@@ -48,13 +42,6 @@ bool BLEUnsignedShortArrayCharacteristic::setUShortValues(unsigned short*vals){
 bool BLEUnsignedShortArrayCharacteristic::getUShortValues(unsigned short* arr){
 
   for(int i =0; i < valueSize(); i+=2){
-    /*
-    Serial.println(i);
-    Serial.print("----i: ");
-    Serial.println(value()[i]);
-    Serial.print("----i+1: ");
-    Serial.println(value()[i+1]);
-    */
     unsigned short now = value()[i+1];
     now = (now<<8) & 0xFF00;
     now += value()[i];

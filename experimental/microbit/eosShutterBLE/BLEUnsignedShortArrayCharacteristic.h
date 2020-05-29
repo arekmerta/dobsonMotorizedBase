@@ -3,7 +3,6 @@
 
 #include "BLEFixedLengthCharacteristic.h"
 
-
 class BLEUnsignedShortArrayCharacteristic : public BLEFixedLengthCharacteristic {
   public:
     BLEUnsignedShortArrayCharacteristic(const char* uuid, unsigned char properties, unsigned char valueSize);
