@@ -25,7 +25,7 @@ BLEService               cameraShutterService          = BLEService            (
 // create switch and button characteristic
 // 1st ushort: no of shots; 2nd ushort: speed in seconds, 3rd byte - elapse in seconds
 //for the 2nd ushort: MSB if set to 1, rest keeps parts of seconds (1/)
-//4th byte: othe settings:
+//4th byte: the settings:
 
 BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsignedShortArrayCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLEWrite, 4);
 
@@ -385,9 +385,12 @@ void loop() {
     Serial.println(nSettings, HEX);
 
     settings.set( nSettings );
+
     cs.setAdaptiveLight ( settings.getAdaptiveLight() );
 
-    if( nSpeed & 0x8000 ){
+    if( settings.getSpeedSecondsSplit() ){
+      Serial.println("BLE: speed: applying 1/x");
+
       //parts of second send
       nSpeed = nSpeed & 0b01111111;
       nSpeed = 1000 / nSpeed;
