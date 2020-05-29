@@ -382,14 +382,18 @@ void loop() {
 
     cs.setAdaptiveLight ( settings.getAdaptiveLight() );
 
-    if( settings.getSpeedSecondsSplit() ){
-      Serial.println("BLE: speed: applying 1/x");
-
-      //parts of second send
-      nSpeed = nSpeed & 0b01111111;
-      nSpeed = 1000 / nSpeed;
+    if(settings.getUseBulbMode()){
+      if( settings.getSpeedSecondsSplit() ){
+        Serial.println("BLE: speed: applying 1/x");
+        //parts of second send
+        nSpeed = nSpeed & 0b01111111;
+        nSpeed = 1000 / nSpeed;
+      }else{
+        nSpeed = nSpeed * 1000;
+      }
     }else{
-      nSpeed = nSpeed * 1000;
+      //Do not control shutter in here - use settings of camera.
+      nSpeed = 50;
     }
 
     nElapse = nElapse * 1000;
