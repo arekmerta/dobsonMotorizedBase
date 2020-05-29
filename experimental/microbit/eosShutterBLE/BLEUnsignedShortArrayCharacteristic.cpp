@@ -58,8 +58,7 @@ bool BLEUnsignedShortArrayCharacteristic::getUShortValues(unsigned short* arr){
     unsigned short now = value()[i+1];
     now = (now<<8) & 0xFF00;
     now += value()[i];
-    
-    Serial.println(now);
+   
     arr[i/2] = now;
   }
   return true;

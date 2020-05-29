@@ -1,13 +1,16 @@
 /*
  * uczymy.edu.pl - based on BLEPeripheral example
  */
- #include <Arduino.h>
+#include <Arduino.h>
 #include <BLEPeripheral.h>
 
 #include "BLEUnsignedShortArrayCharacteristic.h"
 #include "LightSensor.cpp"
 #include "Settings.cpp"
 #include "ScreenDisplay.h"
+
+#define LIGHT_ADJUSTMENT_FACTOR 5
+#define LIGHT_SPEED_CHANGE_THRESHOLD 5
 
 #define diffProc(a,b) ((int)(abs((float)(a-b)/(float)b)*100.))*(a>b?-1:1)
 
@@ -24,7 +27,7 @@ BLEService               cameraShutterService          = BLEService            (
 //for the 2nd ushort: MSB if set to 1, rest keeps parts of seconds (1/)
 //4th byte: othe settings:
 
-BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsignedShortArrayCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLEWrite, 3);
+BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsignedShortArrayCharacteristic ("2f93708401014730ae11df4a514bdfb3", BLEWrite, 4);
 
 //minor short: current shot; major short: status, as:
 #define STATUS_IDLE 0x00
@@ -33,8 +36,12 @@ BLEUnsignedShortArrayCharacteristic    shooterConfigCharacteristic   = BLEUnsign
 #define STATUS_FINISHED 0x03
 #define STATUS_ELAPSE 0x04
 #define STATUS_ABORTED 0x13
+#define STATUS_SPEED_ADJUST 0x21
 
 BLEUnsignedShortArrayCharacteristic    shooterProgressCharacteristic = BLEUnsignedShortArrayCharacteristic ("2f93708401024730ae11df4a514bdfb3", BLERead | BLENotify, 2);
+
+
+
 
 /*
  * Update BLE notifications
@@ -54,15 +61,14 @@ private:
   int _nShotNow = 0;
   int32_t _nSpeedMS = 0;
   int32_t _nElapseMS = 0;
-  int _sensitivityProc = 10;
+
+  //Adaptive light
   bool _adaptiveLight = true;
+  LightSensor _ls;
+
+  //Screen display
   ScreenDisplay *_sd = NULL;
 
-  /*
-   * Light sensor instance
-   */
-  LightSensor _ls = LightSensor();
-  
     
   int triggerShot(){
     Serial.print("Shooting #");
@@ -76,7 +82,6 @@ private:
   }
 
   void adjustLight(boolean dryRun){
-    static int changeFactor = 10;
     static int _firstSpeed = getSpeedMS();
     static int _lastMeasure = 100;
     //Clear display for measures
@@ -97,6 +102,7 @@ private:
     
     int measure = _ls.measure( );
     int diff = diffProc(measure, _lastMeasure);
+    
     Serial.print("Got light measure: ");
     Serial.print(measure);
     Serial.print(", previous: ");
@@ -104,9 +110,9 @@ private:
     Serial.print(", diff: ");
     Serial.println( diff );
     
-    if( abs(diff) > 5 ){
+    if( abs(diff) > LIGHT_SPEED_CHANGE_THRESHOLD ){
         //Now, modify the time by doubling the percentage
-        int32_t newSpeed = getSpeedMS() + (_firstSpeed * ( -1 * diff * changeFactor ))/100;
+        int32_t newSpeed = getSpeedMS() + (_firstSpeed * ( -1 * diff * LIGHT_ADJUSTMENT_FACTOR ))/100;
       
         Serial.print( "Speed change from: " );
         Serial.print( getSpeedMS() );
@@ -116,6 +122,7 @@ private:
         setSpeedMS(
             newSpeed
           );
+        bleUpdateProgress( newSpeed, STATUS_SPEED_ADJUST );
         _lastMeasure = measure;
       }
       _sd->restore(); 
@@ -127,6 +134,8 @@ public:
    * nShots: number of shots
    * nSpeedMS: speed of shutter, in miliseconds
    * nElapseMS: time between shots, in miliseconds
+   * lightAdjust: if true - adapt shutter time to the changing light
+   * sd: screen display
    */
   CameraShutter(
      unsigned int nShots, 
@@ -171,6 +180,8 @@ public:
 
   boolean setAdaptiveLight(bool val){
     _adaptiveLight = val;
+    Serial.print("Adaptive light set to: ");
+    Serial.println(val);
   }
 
   boolean loop(boolean started){
@@ -348,6 +359,7 @@ void loop() {
 
   // poll peripheral
   blePeripheral.poll();
+  // poll display
   sd.loop();
   
   if (shooterConfigCharacteristic.written() ) {
@@ -398,7 +410,8 @@ void loop() {
     Serial.println("Starting shooting session...");
     started = true;
   }
- 
+
+  // poll shutter loop
   started = cs.loop( started );
 
   if (! digitalRead(PIN_BUTTON_A)) {
